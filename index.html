@@ -1,209 +1,211 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>CAPTCHA AI Framework</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+
+<style>
+body{font-family:sans-serif;background:#111;color:#eee;margin:0}
+nav{display:flex;background:#000}
+nav button{flex:1;padding:12px;background:none;color:#aaa;border:none;cursor:pointer}
+nav button.active{color:#fff;border-bottom:2px solid #00ffcc}
+
+.page{display:none;padding:20px}
+.page.active{display:block}
+
+.metric{margin:10px 0;font-size:18px}
+canvas{background:#fff;border-radius:8px;margin-top:10px}
+
+.controls{margin:15px 0}
+</style>
+
+</head>
+
+<body>
+
+<nav>
+<button class="active" onclick="showPage('sim',this)">Dashboard</button>
+<button onclick="showPage('cap',this)">CAPTCHA</button>
+</nav>
+
+<div id="sim" class="page active">
+
+<h2>📊 AI CAPTCHA Dashboard</h2>
+
+<div class="controls">
+Steps <input type="range" id="steps" min="500" max="3000" value="1000"><br>
+Learning Rate <input type="range" id="lr" min="1" max="20" value="8"><br>
+Entropy <input type="range" id="ew" min="1" max="8" value="4"><br>
+Target ARI <input type="range" id="ariTarget" min="50" max="90" value="70"><br>
+<button onclick="runSim()">Run Simulation</button>
+</div>
+
+<div class="metric">Mean ARI: <span id="m_ari"></span></div>
+<div class="metric">Bot Success: <span id="m_bot"></span></div>
+<div class="metric">Human Score: <span id="m_human"></span></div>
+<div class="metric">Stability: <span id="m_stab"></span></div>
+
+<canvas id="ariChart" height="120"></canvas> <canvas id="rocChart" height="120"></canvas> <canvas id="cmChart" height="120"></canvas>
+
+</div>
+
+<div id="cap" class="page">
+<h2>🧠 CAPTCHA</h2>
+<canvas id="captchaCanvas" width="300" height="100"></canvas><br>
+<input id="input" placeholder="Enter text">
+<button onclick="check()">Verify</button>
+</div>
+
 <script>
 
-// =========================
-// BASIC HELPERS
-// =========================
-function sv(id,v){document.getElementById(id).textContent=v}
-
+// NAV
 function showPage(id,btn){
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
-  btn.classList.add('active');
+document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'))
+document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'))
+document.getElementById(id).classList.add('active')
+btn.classList.add('active')
 }
 
-// =========================
-// RANDOM GENERATOR
-// =========================
-function rng(seed){
-  let s=seed;
-  return ()=>{
-    s=(s*1664525+1013904223)&0xffffffff;
-    return (s>>>0)/4294967296;
-  }
+// SIMULATION
+function runSim(){
+
+let steps = +stepsEl.value
+let lr = +lrEl.value/100
+let ew = +ewEl.value/10
+let target = +ariTargetEl.value/100
+
+let difficulty = 0.3
+let strength = 0.5
+
+let ariArr=[],botArr=[],humanArr=[]
+
+for(let i=0;i<steps;i++){
+
+let bot = Math.exp(-12*difficulty*strength)
+
+// entropy effect
+bot *= (1 - ew*0.3)
+
+let human = 0.95 - 0.4*difficulty - 0.25*ew
+
+human = Math.max(0,Math.min(1,human))
+bot = Math.max(0,Math.min(1,bot))
+
+let ari = 0.45*human + 0.45*(1-bot) - 0.1*difficulty
+
+ariArr.push(ari)
+botArr.push(bot)
+humanArr.push(human)
+
+// adaptive
+let err = target - ari
+difficulty += lr*err*0.5
+strength += lr*err*0.3
+
+difficulty=Math.max(0.1,Math.min(1,difficulty))
+strength=Math.max(0.1,Math.min(1,strength))
 }
 
-// =========================
-// GLOBALS
-// =========================
-let ariInst, perfInst;
+// metrics
+let mean = a=>a.reduce((x,y)=>x+y)/a.length
+let mARI = mean(ariArr)
+let mBot = mean(botArr)
+let mHuman = mean(humanArr)
+let std = Math.sqrt(mean(ariArr.map(x=>(x-mARI)**2)))
 
-const CHARS='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+m_ari.innerText = mARI.toFixed(4)
+m_bot.innerText = mBot.toFixed(4)
+m_human.innerText = mHuman.toFixed(4)
+m_stab.innerText = std.toFixed(4)
 
-let captchaText='';
-let difficulty='easy';
+// CHARTS
+new Chart(ariChart,{
+type:'line',
+data:{labels:ariArr.slice(0,100),datasets:[{data:ariArr.slice(0,100)}]}
+})
 
-let attempts=0,passed=0,failed=0;
 
-// =========================
-// DIFFICULTY → NUMERIC
-// =========================
-function getDifficultyValue(){
-  if(difficulty==='easy') return 0.3;
-  if(difficulty==='medium') return 0.6;
-  return 0.9;
+// ROC
+let tpr=[],fpr=[]
+for(let t=0;t<=1;t+=0.05){
+let tp=0,fp=0,tn=0,fn=0
+
+for(let i=0;i<botArr.length;i++){
+let pred = botArr[i]<t
+let actual = Math.random()>botArr[i]
+
+if(pred && actual) tp++
+if(pred && !actual) fp++
+if(!pred && !actual) tn++
+if(!pred && actual) fn++
 }
 
-// =========================
-// CAPTCHA GENERATION
-// =========================
-function setDiff(d,btn){
-  difficulty=d;
-  document.querySelectorAll('.diff-btn').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  newCaptcha();
+tpr.push(tp/(tp+fn+1))
+fpr.push(fp/(fp+tn+1))
 }
 
-function newCaptcha(){
-  const len=difficulty==='easy'?4:difficulty==='medium'?5:6;
-  captchaText='';
-  for(let i=0;i<len;i++){
-    captchaText+=CHARS[Math.floor(Math.random()*CHARS.length)];
-  }
-  drawCaptcha(captchaText,difficulty);
+new Chart(rocChart,{
+type:'line',
+data:{labels:fpr,datasets:[{data:tpr}]}
+})
+
+// CONFUSION MATRIX
+let tp=0,fp=0,tn=0,fn=0
+for(let i=0;i<botArr.length;i++){
+let pred = botArr[i]<0.5
+let actual = Math.random()>botArr[i]
+
+if(pred && actual) tp++
+if(pred && !actual) fp++
+if(!pred && !actual) tn++
+if(!pred && actual) fn++
 }
 
-// =========================
-// DRAW CAPTCHA (IMPROVED)
-// =========================
-function drawCaptcha(text,diff){
-  const canvas=document.getElementById('captchaCanvas');
-  const ctx=canvas.getContext('2d');
-  const W=360,H=100;
+new Chart(cmChart,{
+type:'bar',
+data:{
+labels:["TP","FP","TN","FN"],
+datasets:[{data:[tp,fp,tn,fn]}]
+}
+})
 
-  ctx.clearRect(0,0,W,H);
-  ctx.fillStyle='#f8f6f0';
-  ctx.fillRect(0,0,W,H);
-
-  // NOISE LEVEL
-  const noiseLvl = diff==='easy'?50: diff==='medium'?180:400;
-
-  for(let i=0;i<noiseLvl;i++){
-    ctx.fillStyle='rgba(0,0,0,'+(Math.random()*0.3)+')';
-    ctx.fillRect(Math.random()*W,Math.random()*H,1,1);
-  }
-
-  // TEXT
-  const spacing=W/(text.length+1);
-
-  for(let i=0;i<text.length;i++){
-    ctx.save();
-
-    let x=spacing*(i+1);
-    let y=H/2;
-
-    let angle = (Math.random()-0.5) * (diff==='easy'?0.1: diff==='medium'?0.4:0.8);
-
-    ctx.translate(x,y);
-    ctx.rotate(angle);
-
-    ctx.font='bold '+(diff==='easy'?34:32)+'px Arial';
-    ctx.fillStyle='#000';
-
-    ctx.fillText(text[i],0,0);
-
-    ctx.restore();
-  }
-
-  // BLUR EFFECT
-  if(diff==='medium') canvas.style.filter='blur(1px)';
-  else if(diff==='hard') canvas.style.filter='blur(2.5px)';
-  else canvas.style.filter='none';
 }
 
-// =========================
-// CORE MODEL (🔥 IMPORTANT)
-// =========================
-function computeMetrics(){
+// CAPTCHA
+let text=""
 
-  let d = getDifficultyValue();
-
-  // strength increases with difficulty
-  let strength = d + (Math.random()*0.1);
-
-  // BOT SUCCESS (EXPONENTIAL DECAY)
-  let bot_success = Math.exp(-12 * d * strength);
-
-  // HUMAN SCORE (slightly decreases)
-  let human_score = 0.95 - (d * 0.3) + (Math.random()*0.05);
-
-  human_score = Math.max(0.5, Math.min(1, human_score));
-
-  // ARI FORMULA
-  let ari = 0.45 * human_score + 0.45 * (1 - bot_success) - 0.1 * d;
-
-  // STABILITY (variance simulation)
-  let std = 0.01 + Math.random()*0.02;
-
-  return {
-    bot: bot_success,
-    human: human_score,
-    ari: ari,
-    std: std
-  };
+function newCap(){
+let chars="ABCDEFGH23456789"
+text=""
+for(let i=0;i<5;i++) text+=chars[Math.floor(Math.random()*chars.length)]
+draw()
 }
 
-// =========================
-// VERIFY CAPTCHA
-// =========================
-function checkCap(){
-
-  const input=document.getElementById('capInput').value.trim().toUpperCase();
-  const res=document.getElementById('capResult');
-
-  attempts++;
-  sv('st_total',attempts);
-
-  const m = computeMetrics();
-
-  sv('m_ari', m.ari.toFixed(4));
-  sv('m_bot', m.bot.toFixed(4));
-  sv('m_human', m.human.toFixed(4));
-  sv('m_stab', m.std.toFixed(4));
-
-  const improvement = ((0.30 - m.bot)/0.30 *100).toFixed(1);
-
-  sv('t_bot', m.bot.toFixed(4));
-  sv('t_imp', improvement + '%');
-
-  if(input===captchaText){
-    passed++;
-    sv('st_pass',passed);
-
-    res.textContent='Human Verified ✅';
-    res.className='cap-result ok';
-    res.style.display='block';
-
-  } else {
-    failed++;
-    sv('st_fail',failed);
-
-    res.textContent='Failed ❌ Bot-like behavior detected';
-    res.className='cap-result fail';
-    res.style.display='block';
-  }
-
-  setTimeout(()=>newCaptcha(),2000);
+function draw(){
+let c=captchaCanvas.getContext("2d")
+c.fillStyle="#fff";c.fillRect(0,0,300,100)
+c.font="30px monospace"
+c.fillStyle="#000"
+c.fillText(text,50,60)
 }
 
-// =========================
-// AUDIO
-// =========================
-function speakCap(){
-  if(!window.speechSynthesis)return;
-  const u=new SpeechSynthesisUtterance(captchaText.split('').join(' '));
-  u.rate=0.75;
-  window.speechSynthesis.speak(u);
+function check(){
+alert(input.value.toUpperCase()==text?"HUMAN":"BOT")
+newCap()
 }
 
-// =========================
-// INIT
-// =========================
-document.getElementById('capInput')
-.addEventListener('keydown',e=>{
-  if(e.key==='Enter')checkCap();
-});
+newCap()
 
-newCaptcha();
+// refs
+const stepsEl=steps
+const lrEl=lr
+const ewEl=ew
+const ariTargetEl=ariTarget
 
 </script>
+
+</body>
+</html>
