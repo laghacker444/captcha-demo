@@ -3,217 +3,234 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CAPTCHA AI Framework</title>
+<title>CAPTCHA Framework — Demo</title>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 
 <style>
-body{font-family:Arial;background:#f5f5f5;margin:0}
-nav{display:flex;background:#222;color:#fff}
-nav button{flex:1;padding:15px;background:none;border:none;color:#fff;cursor:pointer}
-nav button.active{background:#444}
+*{box-sizing:border-box;margin:0;padding:0}
 
-.page{display:none;padding:20px}
-.page.active{display:block}
+:root{
+  --bg:#ffffff;
+  --text:#1a1a1a;
+  --border:rgba(0,0,0,0.12);
+  --blue:#378ADD;
+}
 
-.card{background:#fff;padding:15px;margin:10px 0;border-radius:8px}
+body{
+  font-family:'Segoe UI',sans-serif;
+  background:var(--bg);
+  color:var(--text);
+}
 
-canvas{max-width:100%}
-input,button{padding:8px;margin:5px}
-.diff-btn{margin-right:5px}
-.cap-result.ok{color:green}
-.cap-result.fail{color:red}
+/* NAV */
+nav{
+  display:flex;
+  border-bottom:1px solid var(--border);
+  padding:10px;
+}
+
+nav button{
+  background:none;
+  border:none;
+  padding:10px 15px;
+  cursor:pointer;
+}
+
+nav button.active{
+  border-bottom:2px solid black;
+}
+
+/* PAGE */
+.page{
+  display:none;
+  padding:20px;
+}
+
+.page.active{
+  display:block;
+}
+
+/* CONTROLS */
+.controls{
+  margin:20px 0;
+}
+
+.metric{
+  padding:10px;
+  border:1px solid var(--border);
+  margin-top:10px;
+  border-radius:6px;
+}
+
+/* CAPTCHA */
+.captcha-wrap{
+  max-width:400px;
+  margin:auto;
+  padding:20px;
+  border:1px solid var(--border);
+  border-radius:10px;
+}
+
+canvas{
+  display:block;
+  margin-bottom:10px;
+  border:1px solid var(--border);
+}
+
+.cap-input{
+  width:100%;
+  padding:10px;
+  margin-bottom:10px;
+  font-size:16px;
+}
+
+.cap-btn,.cap-submit{
+  padding:10px;
+  width:100%;
+  margin-top:5px;
+  cursor:pointer;
+  border:none;
+  background:black;
+  color:white;
+  border-radius:6px;
+}
+
+.cap-result{
+  margin-top:10px;
+  font-weight:bold;
+}
 </style>
 </head>
 
 <body>
 
+<!-- NAV -->
 <nav>
-<button class="active" onclick="showPage('sim',this)">Dashboard</button>
-<button onclick="showPage('cap',this)">CAPTCHA</button>
+  <button class="active" onclick="showPage('sim',this)">Simulation</button>
+  <button onclick="showPage('cap',this)">CAPTCHA</button>
 </nav>
 
-<!-- DASHBOARD -->
-<div id="sim" class="page active">
-<h2>Simulation Dashboard</h2>
+<!-- SIMULATION -->
+<div class="page active" id="sim">
+  <h2>Simulation Dashboard</h2>
 
-<div class="card">
-Steps <input id="steps" value="5000">
-Target ARI <input id="target" value="80">
-<button onclick="runSim()">Run</button>
-</div>
+  <div class="controls">
+    <label>Steps: <span id="v_steps">1000</span></label>
+    <input type="range" min="500" max="5000" step="500" value="1000"
+      oninput="updateSteps(this.value)">
+    <br><br>
+    <button onclick="runSim()">Run Simulation</button>
+  </div>
 
-<div class="card">
-<p>Mean ARI: <span id="ari">-</span></p>
-<p>Bot Success: <span id="bot">-</span></p>
-<p>Human Score: <span id="human">-</span></p>
-</div>
+  <div class="metric">
+    Mean ARI: <span id="m_ari">0.70</span>
+  </div>
 
-<div class="card">
-<canvas id="chart1"></canvas>
-</div>
-
+  <canvas id="chart" height="100"></canvas>
 </div>
 
 <!-- CAPTCHA -->
-<div id="cap" class="page">
-<h2>CAPTCHA Tester</h2>
+<div class="page" id="cap">
+  <h2>CAPTCHA Tester</h2>
 
-<div class="card">
-<button class="diff-btn" onclick="setDiff('easy',this)">Easy</button>
-<button class="diff-btn" onclick="setDiff('medium',this)">Medium</button>
-<button class="diff-btn" onclick="setDiff('hard',this)">Hard</button>
-</div>
+  <div class="captcha-wrap">
+    <canvas id="captchaCanvas" width="300" height="100"></canvas>
 
-<div class="card">
-<canvas id="captchaCanvas" width="300" height="100"></canvas><br>
-<input id="input" placeholder="Enter CAPTCHA">
-<button onclick="check()">Submit</button>
-<button onclick="newCaptcha()">Refresh</button>
-<p id="result"></p>
-</div>
+    <input id="capInput" class="cap-input" placeholder="Enter CAPTCHA">
 
-<div class="card">
-<p>Total: <span id="t">0</span></p>
-<p>Human: <span id="h">0</span></p>
-<p>Bot: <span id="b">0</span></p>
-<p>ARI: <span id="ari2">0</span></p>
-</div>
+    <button class="cap-btn" onclick="newCaptcha()">New CAPTCHA</button>
+    <button class="cap-submit" onclick="checkCaptcha()">Verify</button>
 
+    <div class="cap-result" id="result"></div>
+  </div>
 </div>
 
 <script>
-
-/* PAGE */
+/* PAGE SWITCH */
 function showPage(id,btn){
-document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'))
-document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'))
-document.getElementById(id).classList.add('active')
-btn.classList.add('active')
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
+
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
 }
 
 /* SIMULATION */
 let chart;
 
-function runSim(){
-let steps=+document.getElementById('steps').value
-let target=+document.getElementById('target').value/100
-
-let ari=0.6,data=[]
-
-for(let i=0;i<steps;i++){
-ari += (target-ari)*0.01 + (Math.random()-0.5)*0.01
-ari=Math.max(0.5,Math.min(0.95,ari))
-
-if(i%100==0) data.push(ari.toFixed(3))
+function updateSteps(val){
+  document.getElementById("v_steps").innerText = val;
 }
 
-let mean=(data.reduce((a,b)=>+a+ +b,0)/data.length).toFixed(4)
-let bot=(0.05+Math.random()*0.02).toFixed(4)
-let human=(0.85+Math.random()*0.05).toFixed(4)
+function runSim(){
+  const steps = 50;
+  let data = [];
+  let val = 0.6;
 
-document.getElementById('ari').innerText=mean
-document.getElementById('bot').innerText=bot
-document.getElementById('human').innerText=human
+  for(let i=0;i<steps;i++){
+    val += (0.8 - val)*0.05 + (Math.random()-0.5)*0.02;
+    data.push(val.toFixed(3));
+  }
 
-if(chart) chart.destroy()
-chart=new Chart(document.getElementById('chart1'),{
-type:'line',
-data:{labels:data.map((_,i)=>i),datasets:[{label:'ARI',data:data}]}
-})
+  document.getElementById("m_ari").innerText =
+    (data.reduce((a,b)=>a+parseFloat(b),0)/data.length).toFixed(4);
+
+  if(chart) chart.destroy();
+
+  chart = new Chart(document.getElementById("chart"),{
+    type:"line",
+    data:{
+      labels:data.map((_,i)=>i),
+      datasets:[{
+        label:"ARI",
+        data:data
+      }]
+    }
+  });
 }
 
 /* CAPTCHA */
-let text='',difficulty='easy'
-let total=0,human=0,bot=0
-
-function setDiff(d,btn){
-difficulty=d
-document.querySelectorAll('.diff-btn').forEach(b=>b.classList.remove('active'))
-btn.classList.add('active')
-newCaptcha()
-}
+const CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+let captcha = "";
 
 function newCaptcha(){
-let len=difficulty==='easy'?4:difficulty==='medium'?5:6
-let chars="ABCDEFGHJKLMNP23456789"
-text=''
+  captcha="";
+  for(let i=0;i<5;i++){
+    captcha += CHARS[Math.floor(Math.random()*CHARS.length)];
+  }
 
-for(let i=0;i<len;i++){
-text+=chars[Math.floor(Math.random()*chars.length)]
+  drawCaptcha();
 }
 
-draw()
-document.getElementById('input').value=''
-document.getElementById('result').innerText=''
+function drawCaptcha(){
+  const canvas=document.getElementById("captchaCanvas");
+  const ctx=canvas.getContext("2d");
+
+  ctx.clearRect(0,0,300,100);
+  ctx.font="30px Arial";
+
+  for(let i=0;i<captcha.length;i++){
+    ctx.fillText(captcha[i],50+i*40,60);
+  }
 }
 
-function draw(){
-let c=document.getElementById('captchaCanvas')
-let ctx=c.getContext('2d')
+function checkCaptcha(){
+  const input=document.getElementById("capInput").value.toUpperCase();
+  const res=document.getElementById("result");
 
-ctx.clearRect(0,0,300,100)
-ctx.fillStyle="#fff"
-ctx.fillRect(0,0,300,100)
+  if(input===captcha){
+    res.innerText="✅ Correct!";
+  }else{
+    res.innerText="❌ Wrong! It was "+captcha;
+  }
 
-let noise = difficulty==='easy'?50: difficulty==='medium'?150:300
-let blur = difficulty==='easy'?0: difficulty==='medium'?1:2
-
-/* noise */
-for(let i=0;i<noise;i++){
-ctx.fillStyle="rgba(0,0,0,0.2)"
-ctx.fillRect(Math.random()*300,Math.random()*100,2,2)
-}
-
-/* text */
-ctx.font="30px Arial"
-for(let i=0;i<text.length;i++){
-ctx.save()
-ctx.translate(40+i*40,60)
-ctx.rotate((Math.random()-0.5)*0.5)
-ctx.fillText(text[i],0,0)
-ctx.restore()
-}
-
-/* blur */
-if(blur>0){
-let imgData=ctx.getImageData(0,0,300,100)
-for(let i=0;i<imgData.data.length;i+=4){
-imgData.data[i]+=blur*5
-}
-ctx.putImageData(imgData,0,0)
-}
-}
-
-function check(){
-let val=document.getElementById('input').value.toUpperCase()
-total++
-
-if(val===text){
-human++
-document.getElementById('result').innerText="Human ✅"
-}else{
-bot++
-document.getElementById('result').innerText="Bot ❌ ("+text+")"
-}
-
-/* ARI formula */
-let human_score=human/total || 0
-let bot_success=bot/total || 0
-let ari = human_score * (1 - bot_success)
-
-document.getElementById('t').innerText=total
-document.getElementById('h').innerText=human
-document.getElementById('b').innerText=bot
-document.getElementById('ari2').innerText=ari.toFixed(3)
-
-setTimeout(newCaptcha,1500)
+  newCaptcha();
 }
 
 /* INIT */
-newCaptcha()
-runSim()
-
+newCaptcha();
+runSim();
 </script>
 
 </body>
