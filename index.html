@@ -1,103 +1,211 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>CAPTCHA AI Framework</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+
+<style>
+body{font-family:sans-serif;background:#111;color:#eee;margin:0}
+nav{display:flex;background:#000}
+nav button{flex:1;padding:12px;background:none;color:#aaa;border:none;cursor:pointer}
+nav button.active{color:#fff;border-bottom:2px solid #00ffcc}
+
+.page{display:none;padding:20px}
+.page.active{display:block}
+
+.metric{margin:10px 0;font-size:18px}
+canvas{background:#fff;border-radius:8px;margin-top:10px}
+
+.controls{margin:15px 0}
+</style>
+
+</head>
+
+<body>
+
+<nav>
+<button class="active" onclick="showPage('sim',this)">Dashboard</button>
+<button onclick="showPage('cap',this)">CAPTCHA</button>
+</nav>
+
+<div id="sim" class="page active">
+
+<h2>📊 AI CAPTCHA Dashboard</h2>
+
+<div class="controls">
+Steps <input type="range" id="steps" min="500" max="3000" value="1000"><br>
+Learning Rate <input type="range" id="lr" min="1" max="20" value="8"><br>
+Entropy <input type="range" id="ew" min="1" max="8" value="4"><br>
+Target ARI <input type="range" id="ariTarget" min="50" max="90" value="70"><br>
+<button onclick="runSim()">Run Simulation</button>
+</div>
+
+<div class="metric">Mean ARI: <span id="m_ari"></span></div>
+<div class="metric">Bot Success: <span id="m_bot"></span></div>
+<div class="metric">Human Score: <span id="m_human"></span></div>
+<div class="metric">Stability: <span id="m_stab"></span></div>
+
+<canvas id="ariChart" height="120"></canvas> <canvas id="rocChart" height="120"></canvas> <canvas id="cmChart" height="120"></canvas>
+
+</div>
+
+<div id="cap" class="page">
+<h2>🧠 CAPTCHA</h2>
+<canvas id="captchaCanvas" width="300" height="100"></canvas><br>
+<input id="input" placeholder="Enter text">
+<button onclick="check()">Verify</button>
+</div>
+
 <script>
 
-// ===== UTIL =====
-function sv(id,v){document.getElementById(id).textContent=v}
-
-// ===== MAIN SIMULATION =====
-function runSim(){
-
-  const steps = parseInt(document.getElementById('s_steps').value);
-  const lr = parseInt(document.getElementById('s_lr').value) / 100;
-  const entropy = parseInt(document.getElementById('s_ew').value) / 10;
-  const targetARI = parseInt(document.getElementById('s_ari').value) / 100;
-
-  let difficulty = 0.35;
-  let strength = 0.55;
-
-  let ari_list=[], bot_list=[], human_list=[];
-
-  for(let i=0;i<steps;i++){
-
-    // 🔥 BOT SUCCESS (Exponential)
-    let bot = Math.exp(-12 * difficulty * strength);
-
-    // 🔥 ENTROPY EFFECT (important)
-    bot *= (1 - entropy * 0.35);
-
-    // 🔥 HUMAN SCORE
-    let human = 0.98 - 0.35*difficulty - 0.25*entropy;
-
-    // clamp
-    bot = Math.max(0.01, Math.min(1, bot));
-    human = Math.max(0.3, Math.min(1, human));
-
-    // 🔥 ARI (YOUR FORMULA)
-    let ari = 0.45 * human + 0.45 * (1 - bot) - 0.1 * difficulty;
-
-    ari = Math.max(0, Math.min(1, ari));
-
-    ari_list.push(ari);
-    bot_list.push(bot);
-    human_list.push(human);
-
-    // 🎯 ADAPTIVE FEEDBACK
-    let error = targetARI - ari;
-
-    difficulty += lr * error * 0.4;
-    strength += lr * error * 0.25;
-
-    difficulty = Math.max(0.15, Math.min(0.9, difficulty));
-    strength = Math.max(0.2, Math.min(1, strength));
-  }
-
-  // ===== METRICS =====
-  const mean = arr => arr.reduce((a,b)=>a+b,0)/arr.length;
-
-  let mARI = mean(ari_list);
-  let mBot = mean(bot_list);
-  let mHuman = mean(human_list);
-
-  let std = Math.sqrt(mean(ari_list.map(x => (x - mARI)**2)));
-
-  // 🎯 FORCE REALISTIC TARGET RANGE (your requirement)
-  mARI = 0.75 + Math.random()*0.05;     // ~0.77
-  mBot = 0.05 + Math.random()*0.02;     // ~0.06
-  mHuman = 0.83 + Math.random()*0.04;   // ~0.85
-  std = 0.02 + Math.random()*0.01;      // ~0.027
-
-  // ===== UPDATE UI =====
-  sv('m_ari', mARI.toFixed(4));
-  sv('m_bot', mBot.toFixed(4));
-  sv('m_human', mHuman.toFixed(4));
-  sv('m_stab', std.toFixed(4));
-
-  // ===== BASELINE COMPARISON =====
-  let baselineBot = 0.30;
-  let improvement = ((baselineBot - mBot)/baselineBot)*100;
-
-  sv('t_bot', mBot.toFixed(4));
-  sv('t_imp', improvement.toFixed(1)+'%');
-  sv('t_ci', '['+(mARI-0.001).toFixed(4)+', '+(mARI+0.001).toFixed(4)+']');
-  sv('t_cd', (mARI/(std+0.01)).toFixed(2));
-
-  // ===== ABLATION =====
-  let base = mARI;
-  let noWarp = base * 0.85;
-  let noEntropy = base * 0.80;
-
-  document.getElementById('ab_base').style.width=(base*100)+'%';
-  document.getElementById('ab_warp').style.width=(noWarp*100)+'%';
-  document.getElementById('ab_ent').style.width=(noEntropy*100)+'%';
-
-  sv('abv_base', base.toFixed(3));
-  sv('abv_warp', noWarp.toFixed(3));
-  sv('abv_ent', noEntropy.toFixed(3));
-
-  // ===== CHART =====
-  buildCharts(ari_list.slice(0,100), Math.random, steps);
+// NAV
+function showPage(id,btn){
+document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'))
+document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'))
+document.getElementById(id).classList.add('active')
+btn.classList.add('active')
 }
 
+// SIMULATION
+function runSim(){
 
-// ===== KEEP YOUR EXISTING CAPTCHA + OTHER FUNCTIONS SAME =====
+let steps = +stepsEl.value
+let lr = +lrEl.value/100
+let ew = +ewEl.value/10
+let target = +ariTargetEl.value/100
+
+let difficulty = 0.3
+let strength = 0.5
+
+let ariArr=[],botArr=[],humanArr=[]
+
+for(let i=0;i<steps;i++){
+
+let bot = Math.exp(-12*difficulty*strength)
+
+// entropy effect
+bot *= (1 - ew*0.3)
+
+let human = 0.95 - 0.4*difficulty - 0.25*ew
+
+human = Math.max(0,Math.min(1,human))
+bot = Math.max(0,Math.min(1,bot))
+
+let ari = 0.45*human + 0.45*(1-bot) - 0.1*difficulty
+
+ariArr.push(ari)
+botArr.push(bot)
+humanArr.push(human)
+
+// adaptive
+let err = target - ari
+difficulty += lr*err*0.5
+strength += lr*err*0.3
+
+difficulty=Math.max(0.1,Math.min(1,difficulty))
+strength=Math.max(0.1,Math.min(1,strength))
+}
+
+// metrics
+let mean = a=>a.reduce((x,y)=>x+y)/a.length
+let mARI = mean(ariArr)
+let mBot = mean(botArr)
+let mHuman = mean(humanArr)
+let std = Math.sqrt(mean(ariArr.map(x=>(x-mARI)**2)))
+
+m_ari.innerText = mARI.toFixed(4)
+m_bot.innerText = mBot.toFixed(4)
+m_human.innerText = mHuman.toFixed(4)
+m_stab.innerText = std.toFixed(4)
+
+// CHARTS
+new Chart(ariChart,{
+type:'line',
+data:{labels:ariArr.slice(0,100),datasets:[{data:ariArr.slice(0,100)}]}
+})
+
+
+// ROC
+let tpr=[],fpr=[]
+for(let t=0;t<=1;t+=0.05){
+let tp=0,fp=0,tn=0,fn=0
+
+for(let i=0;i<botArr.length;i++){
+let pred = botArr[i]<t
+let actual = Math.random()>botArr[i]
+
+if(pred && actual) tp++
+if(pred && !actual) fp++
+if(!pred && !actual) tn++
+if(!pred && actual) fn++
+}
+
+tpr.push(tp/(tp+fn+1))
+fpr.push(fp/(fp+tn+1))
+}
+
+new Chart(rocChart,{
+type:'line',
+data:{labels:fpr,datasets:[{data:tpr}]}
+})
+
+// CONFUSION MATRIX
+let tp=0,fp=0,tn=0,fn=0
+for(let i=0;i<botArr.length;i++){
+let pred = botArr[i]<0.5
+let actual = Math.random()>botArr[i]
+
+if(pred && actual) tp++
+if(pred && !actual) fp++
+if(!pred && !actual) tn++
+if(!pred && actual) fn++
+}
+
+new Chart(cmChart,{
+type:'bar',
+data:{
+labels:["TP","FP","TN","FN"],
+datasets:[{data:[tp,fp,tn,fn]}]
+}
+})
+
+}
+
+// CAPTCHA
+let text=""
+
+function newCap(){
+let chars="ABCDEFGH23456789"
+text=""
+for(let i=0;i<5;i++) text+=chars[Math.floor(Math.random()*chars.length)]
+draw()
+}
+
+function draw(){
+let c=captchaCanvas.getContext("2d")
+c.fillStyle="#fff";c.fillRect(0,0,300,100)
+c.font="30px monospace"
+c.fillStyle="#000"
+c.fillText(text,50,60)
+}
+
+function check(){
+alert(input.value.toUpperCase()==text?"HUMAN":"BOT")
+newCap()
+}
+
+newCap()
+
+// refs
+const stepsEl=steps
+const lrEl=lr
+const ewEl=ew
+const ariTargetEl=ariTarget
 
 </script>
+
+</body>
+</html>
