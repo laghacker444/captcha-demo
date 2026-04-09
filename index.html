@@ -1,264 +1,220 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>CAPTCHA Framework — Demo</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CAPTCHA AI Framework</title>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-/* ✅ YOUR ORIGINAL CSS (UNCHANGED) */
-*{box-sizing:border-box;margin:0;padding:0}
-:root{--bg:#ffffff;--bg2:#f5f5f3;--bg3:#ebebea;--text:#1a1a1a;--text2:#666660;--text3:#999993;--border:rgba(0,0,0,0.12);--border2:rgba(0,0,0,0.22);--teal:#1D9E75;--blue:#378ADD;--coral:#D85A30;--r-md:8px;--r-lg:12px}
-@media(prefers-color-scheme:dark){:root{--bg:#1c1c1a;--bg2:#252523;--bg3:#2e2e2c;--text:#f0ede8;--text2:#a8a49e;--text3:#6e6b66;--border:rgba(255,255,255,0.1);--border2:rgba(255,255,255,0.2)}}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:15px;line-height:1.6}
-nav{display:flex;border-bottom:0.5px solid var(--border);padding:0 1.5rem;background:var(--bg);position:sticky;top:0;z-index:10}
-nav button{background:none;border:none;padding:14px 18px;font-size:14px;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
-nav button.active{color:var(--text);border-bottom-color:var(--text);font-weight:500}
-.page{display:none;padding:1.5rem;max-width:1000px;margin:0 auto}
+body{font-family:Arial;background:#f5f5f5;margin:0}
+nav{display:flex;background:#222;color:#fff}
+nav button{flex:1;padding:15px;background:none;border:none;color:#fff;cursor:pointer}
+nav button.active{background:#444}
+
+.page{display:none;padding:20px}
 .page.active{display:block}
-h1{font-size:20px;font-weight:500;margin-bottom:4px}
-.sub{font-size:13px;color:var(--text2);margin-bottom:1.5rem}
-/* (rest unchanged) */
+
+.card{background:#fff;padding:15px;margin:10px 0;border-radius:8px}
+
+canvas{max-width:100%}
+input,button{padding:8px;margin:5px}
+.diff-btn{margin-right:5px}
+.cap-result.ok{color:green}
+.cap-result.fail{color:red}
 </style>
 </head>
 
 <body>
 
-<!-- ✅ YOUR ORIGINAL HTML (UNCHANGED) -->
 <nav>
-<button class="active" onclick="showPage('sim',this)">Simulation dashboard</button>
-<button onclick="showPage('cap',this)">CAPTCHA tester</button>
+<button class="active" onclick="showPage('sim',this)">Dashboard</button>
+<button onclick="showPage('cap',this)">CAPTCHA</button>
 </nav>
 
-<!-- (ALL YOUR ORIGINAL HTML CONTINUES EXACTLY SAME) -->
+<!-- DASHBOARD -->
+<div id="sim" class="page active">
+<h2>Simulation Dashboard</h2>
+
+<div class="card">
+Steps <input id="steps" value="5000">
+Target ARI <input id="target" value="80">
+<button onclick="runSim()">Run</button>
+</div>
+
+<div class="card">
+<p>Mean ARI: <span id="ari">-</span></p>
+<p>Bot Success: <span id="bot">-</span></p>
+<p>Human Score: <span id="human">-</span></p>
+</div>
+
+<div class="card">
+<canvas id="chart1"></canvas>
+</div>
+
+</div>
+
+<!-- CAPTCHA -->
+<div id="cap" class="page">
+<h2>CAPTCHA Tester</h2>
+
+<div class="card">
+<button class="diff-btn" onclick="setDiff('easy',this)">Easy</button>
+<button class="diff-btn" onclick="setDiff('medium',this)">Medium</button>
+<button class="diff-btn" onclick="setDiff('hard',this)">Hard</button>
+</div>
+
+<div class="card">
+<canvas id="captchaCanvas" width="300" height="100"></canvas><br>
+<input id="input" placeholder="Enter CAPTCHA">
+<button onclick="check()">Submit</button>
+<button onclick="newCaptcha()">Refresh</button>
+<p id="result"></p>
+</div>
+
+<div class="card">
+<p>Total: <span id="t">0</span></p>
+<p>Human: <span id="h">0</span></p>
+<p>Bot: <span id="b">0</span></p>
+<p>ARI: <span id="ari2">0</span></p>
+</div>
+
+</div>
 
 <script>
 
-/* =========================
-   🔥 IMPROVED SCRIPT
-   ========================= */
-
-/* UTIL */
-function sv(id,v){
-  const el=document.getElementById(id);
-  if(el) el.textContent=v;
-}
-
-/* PAGE SWITCH */
+/* PAGE */
 function showPage(id,btn){
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
-  btn.classList.add('active');
+document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'))
+document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'))
+document.getElementById(id).classList.add('active')
+btn.classList.add('active')
 }
 
-/* RNG (more stable) */
-function rng(seed){
-  let s=seed>>>0;
-  return ()=>{
-    s = (s * 1664525 + 1013904223) >>> 0;
-    return s / 4294967296;
-  }
-}
+/* SIMULATION */
+let chart;
 
-/* =========================
-   📊 CHARTS (FIXED + SMOOTHER)
-   ========================= */
-let ariInst, perfInst;
-
-function buildCharts(sm,r,steps){
-
-  const lbls=sm.map((_,i)=>Math.round(i*(steps/sm.length)));
-
-  if(ariInst) ariInst.destroy();
-  ariInst=new Chart(document.getElementById('ariChart'),{
-    type:'line',
-    data:{
-      labels:lbls,
-      datasets:[{
-        label:'ARI',
-        data:sm,
-        borderColor:'#378ADD',
-        tension:0.4,
-        fill:true
-      }]
-    },
-    options:{responsive:true,maintainAspectRatio:false}
-  });
-
-  const dX=[0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9];
-
-  const bot=dX.map(d=>+(Math.exp(-6*d)*(0.3+r()*0.2)).toFixed(3));
-  const human=dX.map(d=>+(0.9-0.1*d + r()*0.01).toFixed(3));
-
-  if(perfInst) perfInst.destroy();
-  perfInst=new Chart(document.getElementById('perfChart'),{
-    type:'line',
-    data:{
-      labels:dX,
-      datasets:[
-        {label:'Bot',data:bot,borderColor:'#D85A30'},
-        {label:'Human',data:human,borderColor:'#1D9E75'}
-      ]
-    },
-    options:{responsive:true,maintainAspectRatio:false}
-  });
-}
-
-/* =========================
-   🚀 SIMULATION (MORE REALISTIC)
-   ========================= */
 function runSim(){
+let steps=+document.getElementById('steps').value
+let target=+document.getElementById('target').value/100
 
-  const steps=parseInt(document.getElementById('s_steps').value);
-  const target=parseInt(document.getElementById('s_ari').value)/100;
+let ari=0.6,data=[]
 
-  const r=rng(Date.now());
+for(let i=0;i<steps;i++){
+ari += (target-ari)*0.01 + (Math.random()-0.5)*0.01
+ari=Math.max(0.5,Math.min(0.95,ari))
 
-  let ari=0.6;
-  let sm=[];
-
-  for(let i=0;i<steps;i++){
-    const noise=(r()-0.5)*0.01;
-    ari += (target - ari)*0.02 + noise;
-    ari=Math.max(0.5,Math.min(0.95,ari));
-
-    if(i % Math.floor(steps/50) === 0){
-      sm.push(+ari.toFixed(4));
-    }
-  }
-
-  const mean = sm.reduce((a,b)=>a+b)/sm.length;
-  const bot = 0.05 + r()*0.02;
-  const human = 0.85 + r()*0.03;
-  const std = 0.02 + r()*0.01;
-
-  sv('m_ari',mean.toFixed(4));
-  sv('m_bot',bot.toFixed(4));
-  sv('m_human',human.toFixed(4));
-  sv('m_stab',std.toFixed(4));
-
-  sv('t_bot',bot.toFixed(4));
-  sv('t_imp',((0.3-bot)/0.3*100).toFixed(1)+'%');
-  sv('t_ci',`[${(mean-0.001).toFixed(4)}, ${(mean+0.001).toFixed(4)}]`);
-  sv('t_cd',((mean-0.3)/(std+0.05)).toFixed(2));
-
-  buildCharts(sm,r,steps);
+if(i%100==0) data.push(ari.toFixed(3))
 }
 
-/* =========================
-   🤖 CAPTCHA (MORE ROBUST)
-   ========================= */
-const CHARS='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+let mean=(data.reduce((a,b)=>+a+ +b,0)/data.length).toFixed(4)
+let bot=(0.05+Math.random()*0.02).toFixed(4)
+let human=(0.85+Math.random()*0.05).toFixed(4)
 
-let captchaText='';
-let difficulty='easy';
-let attempts=0,passed=0,failed=0;
+document.getElementById('ari').innerText=mean
+document.getElementById('bot').innerText=bot
+document.getElementById('human').innerText=human
+
+if(chart) chart.destroy()
+chart=new Chart(document.getElementById('chart1'),{
+type:'line',
+data:{labels:data.map((_,i)=>i),datasets:[{label:'ARI',data:data}]}
+})
+}
+
+/* CAPTCHA */
+let text='',difficulty='easy'
+let total=0,human=0,bot=0
 
 function setDiff(d,btn){
-  difficulty=d;
-  document.querySelectorAll('.diff-btn').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  newCaptcha();
+difficulty=d
+document.querySelectorAll('.diff-btn').forEach(b=>b.classList.remove('active'))
+btn.classList.add('active')
+newCaptcha()
 }
 
 function newCaptcha(){
-  const len = difficulty==='easy'?4 : difficulty==='medium'?5 : 6;
-  captchaText='';
+let len=difficulty==='easy'?4:difficulty==='medium'?5:6
+let chars="ABCDEFGHJKLMNP23456789"
+text=''
 
-  for(let i=0;i<len;i++){
-    captchaText+=CHARS[Math.floor(Math.random()*CHARS.length)];
-  }
-
-  drawCaptcha();
-  document.getElementById('capInput').value='';
-
-  const r=document.getElementById('capResult');
-  r.style.display='none';
+for(let i=0;i<len;i++){
+text+=chars[Math.floor(Math.random()*chars.length)]
 }
 
-/* 🎨 IMPROVED CAPTCHA RENDER */
-function drawCaptcha(){
-  const c=document.getElementById('captchaCanvas');
-  const ctx=c.getContext('2d');
-
-  ctx.clearRect(0,0,c.width,c.height);
-
-  ctx.fillStyle="#f8f6f0";
-  ctx.fillRect(0,0,c.width,c.height);
-
-  /* noise */
-  for(let i=0;i<150;i++){
-    ctx.fillStyle=`rgba(0,0,0,${Math.random()*0.2})`;
-    ctx.fillRect(Math.random()*360,Math.random()*100,2,2);
-  }
-
-  ctx.font="bold 32px monospace";
-
-  for(let i=0;i<captchaText.length;i++){
-    ctx.save();
-
-    const x=50+i*45;
-    const y=60;
-
-    ctx.translate(x,y);
-    ctx.rotate((Math.random()-0.5)*0.4);
-
-    ctx.fillStyle="#000";
-    ctx.fillText(captchaText[i],0,0);
-
-    ctx.restore();
-  }
+draw()
+document.getElementById('input').value=''
+document.getElementById('result').innerText=''
 }
 
-/* VALIDATION */
-function checkCap(){
-  const input=document.getElementById('capInput').value.trim().toUpperCase();
-  const res=document.getElementById('capResult');
+function draw(){
+let c=document.getElementById('captchaCanvas')
+let ctx=c.getContext('2d')
 
-  attempts++;
-  sv('st_total',attempts);
+ctx.clearRect(0,0,300,100)
+ctx.fillStyle="#fff"
+ctx.fillRect(0,0,300,100)
 
-  if(input===captchaText){
-    passed++;
-    sv('st_pass',passed);
-    res.textContent='Verified — you are human!';
-    res.className='cap-result ok';
-  }else{
-    failed++;
-    sv('st_fail',failed);
-    res.textContent='Incorrect — '+captchaText;
-    res.className='cap-result fail';
-  }
+let noise = difficulty==='easy'?50: difficulty==='medium'?150:300
+let blur = difficulty==='easy'?0: difficulty==='medium'?1:2
 
-  res.style.display='block';
-
-  setTimeout(newCaptcha,2000);
+/* noise */
+for(let i=0;i<noise;i++){
+ctx.fillStyle="rgba(0,0,0,0.2)"
+ctx.fillRect(Math.random()*300,Math.random()*100,2,2)
 }
 
-/* AUDIO */
-function speakCap(){
-  if(!window.speechSynthesis) return;
-
-  const u=new SpeechSynthesisUtterance(
-    captchaText.split('').join(' ')
-  );
-  u.rate=0.7;
-  speechSynthesis.speak(u);
+/* text */
+ctx.font="30px Arial"
+for(let i=0;i<text.length;i++){
+ctx.save()
+ctx.translate(40+i*40,60)
+ctx.rotate((Math.random()-0.5)*0.5)
+ctx.fillText(text[i],0,0)
+ctx.restore()
 }
 
-/* ENTER KEY */
-document.getElementById('capInput')
-.addEventListener('keydown',e=>{
-  if(e.key==='Enter') checkCap();
-});
+/* blur */
+if(blur>0){
+let imgData=ctx.getImageData(0,0,300,100)
+for(let i=0;i<imgData.data.length;i+=4){
+imgData.data[i]+=blur*5
+}
+ctx.putImageData(imgData,0,0)
+}
+}
+
+function check(){
+let val=document.getElementById('input').value.toUpperCase()
+total++
+
+if(val===text){
+human++
+document.getElementById('result').innerText="Human ✅"
+}else{
+bot++
+document.getElementById('result').innerText="Bot ❌ ("+text+")"
+}
+
+/* ARI formula */
+let human_score=human/total || 0
+let bot_success=bot/total || 0
+let ari = human_score * (1 - bot_success)
+
+document.getElementById('t').innerText=total
+document.getElementById('h').innerText=human
+document.getElementById('b').innerText=bot
+document.getElementById('ari2').innerText=ari.toFixed(3)
+
+setTimeout(newCaptcha,1500)
+}
 
 /* INIT */
-newCaptcha();
-runSim();
+newCaptcha()
+runSim()
 
 </script>
+
 </body>
 </html>
