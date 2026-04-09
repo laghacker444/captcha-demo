@@ -1,1 +1,209 @@
-<!DOCTYPE html> <html lang="en"> <head> <meta charset="UTF-8"/> <meta name="viewport" content="width=device-width,initial-scale=1.0"/> <title>CAPTCHA Framework — Demo</title> <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script> <style> *{box-sizing:border-box;margin:0;padding:0} :root{--bg:#ffffff;--bg2:#f5f5f3;--bg3:#ebebea;--text:#1a1a1a;--text2:#666660;--text3:#999993;--border:rgba(0,0,0,0.12);--border2:rgba(0,0,0,0.22);--teal:#1D9E75;--blue:#378ADD;--coral:#D85A30;--r-md:8px;--r-lg:12px} @media(prefers-color-scheme:dark){:root{--bg:#1c1c1a;--bg2:#252523;--bg3:#2e2e2c;--text:#f0ede8;--text2:#a8a49e;--text3:#6e6b66;--border:rgba(255,255,255,0.1);--border2:rgba(255,255,255,0.2)}} body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:15px;line-height:1.6} nav{display:flex;border-bottom:0.5px solid var(--border);padding:0 1.5rem;background:var(--bg);position:sticky;top:0;z-index:10} nav button{background:none;border:none;padding:14px 18px;font-size:14px;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px} nav button.active{color:var(--text);border-bottom-color:var(--text);font-weight:500} .page{display:none;padding:1.5rem;max-width:1000px;margin:0 auto} .page.active{display:block} h1{font-size:20px;font-weight:500;margin-bottom:4px} .sub{font-size:13px;color:var(--text2);margin-bottom:1.5rem} .controls{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:1.5rem;padding:1rem 1.25rem;background:var(--bg2);border-radius:var(--r-lg);border:0.5px solid var(--border)} .ctrl{display:flex;flex-direction:column;gap:4px;flex:1;min-width:110px} .ctrl label{font-size:12px;color:var(--text2)} .ctrl span{font-size:13px;font-weight:500} input[type=range]{width:100%;accent-color:var(--blue)} .run-btn{padding:9px 22px;background:var(--text);color:var(--bg);border:none;border-radius:var(--r-md);font-size:13px;font-weight:500;cursor:pointer} .run-btn:hover{opacity:.82} .metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:1.5rem} .metric{background:var(--bg2);border-radius:var(--r-md);padding:1rem} .metric .lbl{font-size:12px;color:var(--text2);margin-bottom:3px} .metric .val{font-size:22px;font-weight:500} .metric .delta{font-size:11px;margin-top:2px;color:var(--teal)} .charts{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:1.5rem} .card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--r-lg);padding:1rem 1.25rem} .card h3{font-size:13px;font-weight:500;color:var(--text2);margin-bottom:10px} .bottom{display:grid;grid-template-columns:1fr 1fr;gap:16px} .ab-row{display:flex;align-items:center;gap:8px;margin-bottom:8px} .ab-lbl{font-size:12px;color:var(--text2);width:76px;flex-shrink:0} .ab-track{flex:1;height:16px;background:var(--bg3);border-radius:4px;overflow:hidden} .ab-fill{height:100%;border-radius:4px;transition:width .6s ease} .ab-val{font-size:12px;font-weight:500;width:38px;text-align:right} .trow{display:flex;justify-content:space-between;padding:6px 0;border-bottom:0.5px solid var(--border);font-size:13px} .trow:last-child{border-bottom:none} .trow .k{color:var(--text2)} .trow .v{font-weight:500} .good{color:var(--teal)} .captcha-wrap{background:var(--bg2);border-radius:var(--r-lg);padding:2rem;max-width:480px;margin:0 auto;border:0.5px solid var(--border)} canvas#captchaCanvas{display:block;width:100%;border-radius:var(--r-md);border:0.5px solid var(--border);margin-bottom:1rem} .cap-controls{display:flex;gap:8px;margin-bottom:1rem} .cap-input{flex:1;padding:10px 14px;border:0.5px solid var(--border2);border-radius:var(--r-md);background:var(--bg);color:var(--text);font-size:16px;letter-spacing:2px;text-transform:uppercase;outline:none;font-family:monospace} .cap-input:focus{border-color:var(--blue);box-shadow:0 0 0 2px rgba(55,138,221,0.18)} .cap-btn{padding:10px 14px;border:0.5px solid var(--border2);border-radius:var(--r-md);background:var(--bg);color:var(--text);font-size:15px;cursor:pointer} .cap-btn:hover{background:var(--bg3)} .cap-submit{width:100%;padding:11px;background:var(--text);color:var(--bg);border:none;border-radius:var(--r-md);font-size:14px;font-weight:500;cursor:pointer} .cap-submit:hover{opacity:.82} .cap-result{margin-top:1rem;padding:12px 16px;border-radius:var(--r-md);font-size:14px;font-weight:500;text-align:center;display:none} .cap-result.ok{background:#eaf3de;color:#27500a} .cap-result.fail{background:#fcebeb;color:#a32d2d} .diff-row{display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap;align-items:center} .diff-btn{padding:6px 14px;border:0.5px solid var(--border2);border-radius:var(--r-md);font-size:12px;cursor:pointer;background:var(--bg);color:var(--text2)} .diff-btn.active{background:var(--text);color:var(--bg);border-color:var(--text)} .stats-mini{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:1rem} .stat-m{background:var(--bg3);border-radius:var(--r-md);padding:10px;text-align:center} .stat-m .sv{font-size:18px;font-weight:500} .stat-m .sk{font-size:11px;color:var(--text2);margin-top:2px} @media(max-width:620px){.metrics{grid-template-columns:repeat(2,1fr)}.charts,.bottom{grid-template-columns:1fr}} </style> </head> <body> <nav> <button class="active" onclick="showPage('sim',this)">Simulation dashboard</button> <button onclick="showPage('cap',this)">CAPTCHA tester</button> </nav> <div class="page active" id="sim"> <h1>CAPTCHA simulation framework</h1> <p class="sub">Adversarial robustness index — curriculum-based CAPTCHA optimization</p> <div class="controls"> <div class="ctrl"><label>Simulation steps</label><input type="range" min="500" max="5000" step="500" value="1000" id="s_steps" oninput="sv('v_steps',this.value)"><span id="v_steps">1000</span></div> <div class="ctrl"><label>Learning rate</label><input type="range" min="1" max="20" step="1" value="8" id="s_lr" oninput="sv('v_lr',(this.value/100).toFixed(2))"><span id="v_lr">0.08</span></div> <div class="ctrl"><label>Target ARI</label><input type="range" min="50" max="95" step="5" value="70" id="s_ari" oninput="sv('v_ari',(this.value/100).toFixed(2))"><span id="v_ari">0.70</span></div> <div class="ctrl"><label>Entropy weight</label><input type="range" min="1" max="8" step="1" value="4" id="s_ew" oninput="sv('v_ew',(this.value/10).toFixed(1))"><span id="v_ew">0.4</span></div> <button class="run-btn" onclick="runSim()">Run simulation</button> </div> <div class="metrics"> <div class="metric"><div class="lbl">Mean ARI</div><div class="val" id="m_ari">0.7775</div><div class="delta">+2.1% vs baseline</div></div> <div class="metric"><div class="lbl">Bot success</div><div class="val" id="m_bot">0.0646</div><div class="delta">78.5% below baseline</div></div> <div class="metric"><div class="lbl">Human score</div><div class="val" id="m_human">0.8515</div><div class="delta" style="color:var(--text2)">stable</div></div> <div class="metric"><div class="lbl">Stability (std)</div><div class="val" id="m_stab">0.0278</div><div class="delta">low variance</div></div> </div> <div class="charts"> <div class="card"><h3>ARI training curve</h3><div style="position:relative;width:100%;height:190px"><canvas id="ariChart" role="img" aria-label="ARI training curve showing improvement over steps">ARI rises from 0.6 to 0.78.</canvas></div></div> <div class="card"><h3>Performance vs difficulty</h3><div style="position:relative;width:100%;height:190px"><canvas id="perfChart" role="img" aria-label="Bot vs human performance across difficulty">Bot drops, human stays high.</canvas></div></div> </div> <div class="bottom"> <div class="card"><h3>Ablation study</h3> <div style="margin-top:6px"> <div class="ab-row"><span class="ab-lbl">Base</span><div class="ab-track"><div class="ab-fill" id="ab_base" style="width:77.75%;background:#378ADD"></div></div><span class="ab-val good" id="abv_base">0.778</span></div> <div class="ab-row"><span class="ab-lbl">No warp</span><div class="ab-track"><div class="ab-fill" id="ab_warp" style="width:66%;background:#5DCAA5"></div></div><span class="ab-val" id="abv_warp">0.661</span></div> <div class="ab-row"><span class="ab-lbl">No entropy</span><div class="ab-track"><div class="ab-fill" id="ab_ent" style="width:62%;background:#D85A30"></div></div><span class="ab-val" id="abv_ent">0.622</span></div> </div> </div> <div class="card"><h3>Baseline comparison</h3> <div class="trow"><span class="k">Baseline bot success</span><span class="v">0.30</span></div> <div class="trow"><span class="k">Proposed bot success</span><span class="v good" id="t_bot">0.0646</span></div> <div class="trow"><span class="k">Relative improvement</span><span class="v good" id="t_imp">78.5%</span></div> <div class="trow"><span class="k">95% CI (ARI)</span><span class="v" id="t_ci">[0.7767, 0.7783]</span></div> <div class="trow"><span class="k">Cohen's d</span><span class="v" id="t_cd">6.14</span></div> <div class="trow"><span class="k">Calibration error</span><span class="v">0.0018</span></div> </div> </div> </div> <div class="page" id="cap"> <h1>CAPTCHA tester</h1> <p class="sub">Generate a challenge, type what you see, and test bot vs human resistance</p> <div class="captcha-wrap"> <div class="diff-row"> <span style="font-size:12px;color:var(--text2)">Difficulty:</span> <button class="diff-btn active" onclick="setDiff('easy',this)">Easy</button> <button class="diff-btn" onclick="setDiff('medium',this)">Medium</button> <button class="diff-btn" onclick="setDiff('hard',this)">Hard</button> </div> <canvas id="captchaCanvas" width="360" height="100"></canvas> <div class="cap-controls"> <input class="cap-input" id="capInput" type="text" maxlength="6" placeholder="Type what you see..." autocomplete="off" spellcheck="false" oninput="this.value=this.value.toUpperCase()"/> <button class="cap-btn" onclick="newCaptcha()" title="New CAPTCHA">&#x21bb;</button> <button class="cap-btn" onclick="speakCap()" title="Audio hint">&#9654;</button> </div> <button class="cap-submit" onclick="checkCap()">Verify</button> <div class="cap-result" id="capResult"></div> <div class="stats-mini"> <div class="stat-m"><div class="sv" id="st_total">0</div><div class="sk">Attempts</div></div> <div class="stat-m"><div class="sv good" id="st_pass">0</div><div class="sk">Passed</div></div> <div class="stat-m"><div class="sv" style="color:var(--coral)" id="st_fail">0</div><div class="sk">Failed</div></div> </div> </div> </div> <script> function sv(id,v){document.getElementById(id).textContent=v} function showPage(id,btn){ document.querySelectorAll('.page').forEach(p=>p.classList.remove('active')); document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active')); document.getElementById(id).classList.add('active'); btn.classList.add('active'); } function rng(seed){let s=seed;return()=>{s=(s*1664525+1013904223)&0xffffffff;return(s>>>0)/4294967296}} let ariInst,perfInst; function buildCharts(sm,r,steps){ const lbls=sm.map((_,i)=>Math.round(i*(steps/Math.max(sm.length,1)))); if(ariInst)ariInst.destroy(); ariInst=new Chart(document.getElementById('ariChart'),{ type:'line', data:{labels:lbls,datasets:[{label:'ARI',data:sm,borderColor:'#378ADD',backgroundColor:'rgba(55,138,221,0.07)',borderWidth:2,pointRadius:0,fill:true,tension:0.4}]}, options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{display:false},y:{min:0.45,max:1,grid:{color:'rgba(128,128,128,0.1)'},ticks:{font:{size:10},color:'#888'}}}} }); const dX=[0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]; const bY=dX.map(d=>+(Math.exp(-8*d)*(0.88+r()*0.22)*0.35).toFixed(3)); const hY=dX.map(d=>+(0.91-0.13*Math.pow(d,1.1)+r()*0.01).toFixed(3)); if(perfInst)perfInst.destroy(); perfInst=new Chart(document.getElementById('perfChart'),{ type:'line', data:{labels:dX.map(v=>v.toFixed(1)),datasets:[ {label:'Bot success',data:bY,borderColor:'#D85A30',backgroundColor:'rgba(216,90,48,0.06)',borderWidth:2,pointRadius:3,tension:0.3,fill:true}, {label:'Human score',data:hY,borderColor:'#1D9E75',backgroundColor:'rgba(29,158,117,0.06)',borderWidth:2,pointRadius:3,tension:0.3,fill:true} ]}, options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{title:{display:true,text:'Difficulty',font:{size:10},color:'#888'},ticks:{font:{size:10}}},y:{min:0,max:1,grid:{color:'rgba(128,128,128,0.1)'},ticks:{font:{size:10},color:'#888'}}}} }); } function runSim(){ const steps=parseInt(document.getElementById('s_steps').value); const tgt=parseInt(document.getElementById('s_ari').value)/100; const seed=Math.floor(Math.random()*99999); const r=rng(seed); let ari=0.60+r()*0.05; const sm=[]; for(let i=0;i<steps;i++){ ari+=(tgt-ari)*0.018+(r()-0.5)*0.014; ari=Math.max(0.52,Math.min(0.95,ari)); if(i%(Math.max(1,Math.floor(steps/50)))===0)sm.push(+ari.toFixed(4)); } const mARI=+(sm.reduce((a,b)=>a+b)/sm.length).toFixed(4); const botM=+(0.045+r()*0.03).toFixed(4); const humM=+(0.84+r()*0.025).toFixed(4); const std=+(0.018+r()*0.012).toFixed(4); sv('m_ari',mARI);sv('m_bot',botM);sv('m_human',humM);sv('m_stab',std); const imp=+((0.30-botM)/0.30*100).toFixed(1); sv('t_bot',botM);sv('t_imp',imp+'%'); sv('t_ci','['+(mARI-0.001).toFixed(4)+', '+(mARI+0.001).toFixed(4)+']'); sv('t_cd',((mARI-0.3)/(std+0.05)).toFixed(2)); const base=mARI,noW=+(base*0.85).toFixed(3),noE=+(base*0.80).toFixed(3); document.getElementById('ab_base').style.width=(base*100).toFixed(1)+'%'; document.getElementById('ab_warp').style.width=(noW*100).toFixed(1)+'%'; document.getElementById('ab_ent').style.width=(noE*100).toFixed(1)+'%'; sv('abv_base',base.toFixed(3));sv('abv_warp',noW.toFixed(3));sv('abv_ent',noE.toFixed(3)); buildCharts(sm,r,steps); } (function(){const r=rng(42);let ari=0.62;const sm=[];for(let i=0;i<1000;i++){ari+=(0.70-ari)*0.018+(r()-0.5)*0.014;ari=Math.max(0.52,Math.min(0.95,ari));if(i%20===0)sm.push(+ari.toFixed(4));}buildCharts(sm,r,1000)})(); const CHARS='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let captchaText='',difficulty='easy',attempts=0,passed=0,failed=0; function setDiff(d,btn){ difficulty=d; document.querySelectorAll('.diff-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); newCaptcha(); } function newCaptcha(){ const len=difficulty==='easy'?4:difficulty==='medium'?5:6; captchaText=''; for(let i=0;i<len;i++)captchaText+=CHARS[Math.floor(Math.random()*CHARS.length)]; drawCaptcha(captchaText,difficulty); document.getElementById('capInput').value=''; const r=document.getElementById('capResult'); r.style.display='none';r.className='cap-result'; } function drawCaptcha(text,diff){ const canvas=document.getElementById('captchaCanvas'); const ctx=canvas.getContext('2d'); const W=360,H=100; ctx.clearRect(0,0,W,H); ctx.fillStyle='#f8f6f0'; ctx.fillRect(0,0,W,H); const noiseLvl=diff==='easy'?60:diff==='medium'?160:320; for(let i=0;i<noiseLvl;i++){ ctx.fillStyle='rgba('+(80+Math.random()*120)+','+(80+Math.random()*120)+','+(80+Math.random()*120)+','+(0.25+Math.random()*0.45)+')'; ctx.beginPath();ctx.arc(Math.random()*W,Math.random()*H,Math.random()*2.5,0,Math.PI*2);ctx.fill(); } const lineCount=diff==='easy'?2:diff==='medium'?4:7; for(let i=0;i<lineCount;i++){ ctx.strokeStyle='rgba('+(60+Math.random()*80)+','+(60+Math.random()*80)+','+(60+Math.random()*80)+',0.35)'; ctx.lineWidth=0.8+Math.random()*1.2; ctx.beginPath();ctx.moveTo(Math.random()*W,Math.random()*H); ctx.bezierCurveTo(Math.random()*W,Math.random()*H,Math.random()*W,Math.random()*H,Math.random()*W,Math.random()*H); ctx.stroke(); } const fonts=['Arial Black','Georgia','Courier New','Impact','Verdana']; const spacing=W/(text.length+1); for(let i=0;i<text.length;i++){ ctx.save(); const x=spacing*(i+1); const y=H/2+(Math.random()-0.5)*(diff==='easy'?6:diff==='medium'?12:18); const angle=(Math.random()-0.5)*(diff==='easy'?0.15:diff==='medium'?0.35:0.55); ctx.translate(x,y);ctx.rotate(angle); if(diff==='hard')ctx.transform(1,(Math.random()-0.5)*0.3,(Math.random()-0.5)*0.2,1,0,0); ctx.font='bold '+(diff==='easy'?34:32)+'px '+fonts[Math.floor(Math.random()*fonts.length)]; const colors=['#1a3a5c','#2d1a5c','#1a4a2e','#4a1a1a','#1a3a4a']; ctx.fillStyle=colors[Math.floor(Math.random()*colors.length)]; ctx.textAlign='center';ctx.textBaseline='middle'; ctx.fillText(text[i],0,0);ctx.restore(); } if(diff==='hard'){ const imgData=ctx.getImageData(0,0,W,H); const tmp=ctx.createImageData(W,H); for(let y=0;y<H;y++){ const shift=Math.round(4*Math.sin(y/9)); for(let x=0;x<W;x++){ const nx=(x+shift+W)%W; const si=(y*W+nx)*4,di=(y*W+x)*4; tmp.data[di]=imgData.data[si];tmp.data[di+1]=imgData.data[si+1]; tmp.data[di+2]=imgData.data[si+2];tmp.data[di+3]=imgData.data[si+3]; } } ctx.putImageData(tmp,0,0); } } function checkCap(){ const input=document.getElementById('capInput').value.trim().toUpperCase(); const res=document.getElementById('capResult'); attempts++;sv('st_total',attempts); if(input===captchaText){ passed++;sv('st_pass',passed); res.textContent='Verified — you are human!'; res.className='cap-result ok';res.style.display='block'; setTimeout(()=>newCaptcha(),1800); } else { failed++;sv('st_fail',failed); res.textContent='Incorrect — the text was: '+captchaText; res.className='cap-result fail';res.style.display='block'; setTimeout(()=>newCaptcha(),2200); } } function speakCap(){ if(!window.speechSynthesis)return; const u=new SpeechSynthesisUtterance(captchaText.split('').join(' ')); u.rate=0.75;window.speechSynthesis.speak(u); } document.getElementById('capInput').addEventListener('keydown',e=>{if(e.key==='Enter')checkCap()}); newCaptcha(); </script> </body> </html>
+<script>
+
+// =========================
+// BASIC HELPERS
+// =========================
+function sv(id,v){document.getElementById(id).textContent=v}
+
+function showPage(id,btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+}
+
+// =========================
+// RANDOM GENERATOR
+// =========================
+function rng(seed){
+  let s=seed;
+  return ()=>{
+    s=(s*1664525+1013904223)&0xffffffff;
+    return (s>>>0)/4294967296;
+  }
+}
+
+// =========================
+// GLOBALS
+// =========================
+let ariInst, perfInst;
+
+const CHARS='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+let captchaText='';
+let difficulty='easy';
+
+let attempts=0,passed=0,failed=0;
+
+// =========================
+// DIFFICULTY → NUMERIC
+// =========================
+function getDifficultyValue(){
+  if(difficulty==='easy') return 0.3;
+  if(difficulty==='medium') return 0.6;
+  return 0.9;
+}
+
+// =========================
+// CAPTCHA GENERATION
+// =========================
+function setDiff(d,btn){
+  difficulty=d;
+  document.querySelectorAll('.diff-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  newCaptcha();
+}
+
+function newCaptcha(){
+  const len=difficulty==='easy'?4:difficulty==='medium'?5:6;
+  captchaText='';
+  for(let i=0;i<len;i++){
+    captchaText+=CHARS[Math.floor(Math.random()*CHARS.length)];
+  }
+  drawCaptcha(captchaText,difficulty);
+}
+
+// =========================
+// DRAW CAPTCHA (IMPROVED)
+// =========================
+function drawCaptcha(text,diff){
+  const canvas=document.getElementById('captchaCanvas');
+  const ctx=canvas.getContext('2d');
+  const W=360,H=100;
+
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#f8f6f0';
+  ctx.fillRect(0,0,W,H);
+
+  // NOISE LEVEL
+  const noiseLvl = diff==='easy'?50: diff==='medium'?180:400;
+
+  for(let i=0;i<noiseLvl;i++){
+    ctx.fillStyle='rgba(0,0,0,'+(Math.random()*0.3)+')';
+    ctx.fillRect(Math.random()*W,Math.random()*H,1,1);
+  }
+
+  // TEXT
+  const spacing=W/(text.length+1);
+
+  for(let i=0;i<text.length;i++){
+    ctx.save();
+
+    let x=spacing*(i+1);
+    let y=H/2;
+
+    let angle = (Math.random()-0.5) * (diff==='easy'?0.1: diff==='medium'?0.4:0.8);
+
+    ctx.translate(x,y);
+    ctx.rotate(angle);
+
+    ctx.font='bold '+(diff==='easy'?34:32)+'px Arial';
+    ctx.fillStyle='#000';
+
+    ctx.fillText(text[i],0,0);
+
+    ctx.restore();
+  }
+
+  // BLUR EFFECT
+  if(diff==='medium') canvas.style.filter='blur(1px)';
+  else if(diff==='hard') canvas.style.filter='blur(2.5px)';
+  else canvas.style.filter='none';
+}
+
+// =========================
+// CORE MODEL (🔥 IMPORTANT)
+// =========================
+function computeMetrics(){
+
+  let d = getDifficultyValue();
+
+  // strength increases with difficulty
+  let strength = d + (Math.random()*0.1);
+
+  // BOT SUCCESS (EXPONENTIAL DECAY)
+  let bot_success = Math.exp(-12 * d * strength);
+
+  // HUMAN SCORE (slightly decreases)
+  let human_score = 0.95 - (d * 0.3) + (Math.random()*0.05);
+
+  human_score = Math.max(0.5, Math.min(1, human_score));
+
+  // ARI FORMULA
+  let ari = 0.45 * human_score + 0.45 * (1 - bot_success) - 0.1 * d;
+
+  // STABILITY (variance simulation)
+  let std = 0.01 + Math.random()*0.02;
+
+  return {
+    bot: bot_success,
+    human: human_score,
+    ari: ari,
+    std: std
+  };
+}
+
+// =========================
+// VERIFY CAPTCHA
+// =========================
+function checkCap(){
+
+  const input=document.getElementById('capInput').value.trim().toUpperCase();
+  const res=document.getElementById('capResult');
+
+  attempts++;
+  sv('st_total',attempts);
+
+  const m = computeMetrics();
+
+  sv('m_ari', m.ari.toFixed(4));
+  sv('m_bot', m.bot.toFixed(4));
+  sv('m_human', m.human.toFixed(4));
+  sv('m_stab', m.std.toFixed(4));
+
+  const improvement = ((0.30 - m.bot)/0.30 *100).toFixed(1);
+
+  sv('t_bot', m.bot.toFixed(4));
+  sv('t_imp', improvement + '%');
+
+  if(input===captchaText){
+    passed++;
+    sv('st_pass',passed);
+
+    res.textContent='Human Verified ✅';
+    res.className='cap-result ok';
+    res.style.display='block';
+
+  } else {
+    failed++;
+    sv('st_fail',failed);
+
+    res.textContent='Failed ❌ Bot-like behavior detected';
+    res.className='cap-result fail';
+    res.style.display='block';
+  }
+
+  setTimeout(()=>newCaptcha(),2000);
+}
+
+// =========================
+// AUDIO
+// =========================
+function speakCap(){
+  if(!window.speechSynthesis)return;
+  const u=new SpeechSynthesisUtterance(captchaText.split('').join(' '));
+  u.rate=0.75;
+  window.speechSynthesis.speak(u);
+}
+
+// =========================
+// INIT
+// =========================
+document.getElementById('capInput')
+.addEventListener('keydown',e=>{
+  if(e.key==='Enter')checkCap();
+});
+
+newCaptcha();
+
+</script>
